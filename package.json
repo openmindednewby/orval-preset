@@ -1,6 +1,6 @@
 {
   "name": "@dloizides/orval-preset",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared Orval generation setup for the dloizides.com SaaS frontends: a 6-API config factory (defineOrvalConfig), the per-service mutator registry, and the axios-bridge createHttpClient factory (transport injected as a port). Owned shape erevna-web and katalogos-web shared byte-for-byte; never imports a product.",
   "keywords": [
     "orval",
