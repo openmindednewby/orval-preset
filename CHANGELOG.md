@@ -2,6 +2,15 @@
 
 All notable changes to `@dloizides/orval-preset` are documented here.
 
+## [1.1.0] - 2026-11-13
+
+### Added
+
+- `defineOrvalConfig({ apis })`: the APIs to generate (`OrvalApiDescriptor[]`);
+  omitted = the six legacy services, so existing consumers are unchanged.
+- Per-API `infinite: { cursorParam, operations? }`: sets Orval `useInfinite` +
+  `useInfiniteQueryParam` on the whole API, or only on the named operationIds.
+
 ## [1.0.0] - 2026-06-14
 
 ### Added

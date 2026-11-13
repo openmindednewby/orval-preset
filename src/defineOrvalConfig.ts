@@ -28,11 +28,40 @@ export interface DefineOrvalConfigOptions {
   mutatorPath: string;
   /** Optional prettier override (defaults to true, matching the legacy config). */
   prettier?: boolean;
+  /** APIs to generate; omitted = the six legacy services, unchanged. */
+  apis?: readonly OrvalApiDescriptor[];
+}
+
+/** Infinite-query setup: the cursor query param and, optionally, the only operationIds it applies to. */
+export interface OrvalInfiniteOption {
+  cursorParam: string;
+  operations?: readonly string[];
+}
+
+/** One API to generate: config key, swagger/dir slug, mutator file + export, echo label, optional paging. */
+export interface OrvalApiDescriptor {
+  key: string;
+  slug: string;
+  mutatorFile: string;
+  mutatorName: string;
+  label: string;
+  infinite?: OrvalInfiniteOption;
 }
 
 interface OrvalMutatorOverride {
   path: string;
   name: string;
+}
+
+interface OrvalQueryOverride {
+  useInfinite: true;
+  useInfiniteQueryParam: string;
+}
+
+interface OrvalOverride {
+  mutator: OrvalMutatorOverride;
+  query?: OrvalQueryOverride;
+  operations?: Record<string, { query: OrvalQueryOverride }>;
 }
 
 interface OrvalHookCommand {
@@ -51,9 +80,7 @@ interface OrvalApiEntry {
     clean: boolean;
     prettier: boolean;
     schemas: string;
-    override: {
-      mutator: OrvalMutatorOverride;
-    };
+    override: OrvalOverride;
   };
   hooks: {
     afterAllFilesWrite: OrvalHookCommand[];
@@ -62,21 +89,8 @@ interface OrvalApiEntry {
 
 export type OrvalConfig = Record<string, OrvalApiEntry>;
 
-interface ApiDescriptor {
-  /** Orval config key (e.g. `onlineMenuApi`). */
-  key: string;
-  /** Swagger file basename without extension + the generated dir name (e.g. `onlinemenu`). */
-  slug: string;
-  /** Mutator file basename without extension (e.g. `onlineMenuMutator`). */
-  mutatorFile: string;
-  /** Exported mutator function name (e.g. `customInstance`). */
-  mutatorName: string;
-  /** Human label used in the generated success echo. */
-  label: string;
-}
-
 // The six services both apps generate, in the legacy config's order.
-const API_DESCRIPTORS: readonly ApiDescriptor[] = [
+const API_DESCRIPTORS: readonly OrvalApiDescriptor[] = [
   {
     key: 'onlineMenuApi',
     slug: 'onlinemenu',
@@ -138,8 +152,30 @@ function joinPath(base: string, segment: string): string {
   return `${stripTrailingSlashes(base)}/${segment}`;
 }
 
+function buildOverride(descriptor: OrvalApiDescriptor, mutatorPath: string): OrvalOverride {
+  const override: OrvalOverride = {
+    mutator: {
+      path: joinPath(mutatorPath, `${descriptor.mutatorFile}.ts`),
+      name: descriptor.mutatorName,
+    },
+  };
+  const infinite = descriptor.infinite;
+  if (infinite === undefined) {
+    return override;
+  }
+  const query: OrvalQueryOverride = { useInfinite: true, useInfiniteQueryParam: infinite.cursorParam };
+  if (infinite.operations === undefined) {
+    return { ...override, query };
+  }
+  const operations: Record<string, { query: OrvalQueryOverride }> = {};
+  for (const operationId of infinite.operations) {
+    operations[operationId] = { query };
+  }
+  return { ...override, operations };
+}
+
 function buildApiEntry(
-  descriptor: ApiDescriptor,
+  descriptor: OrvalApiDescriptor,
   options: Required<Pick<DefineOrvalConfigOptions, 'swaggerDir' | 'outDir' | 'mutatorPath' | 'prettier'>>,
 ): OrvalApiEntry {
   const generatedDir = joinPath(options.outDir, descriptor.slug);
@@ -155,12 +191,7 @@ function buildApiEntry(
       clean: true,
       prettier: options.prettier,
       schemas: joinPath(generatedDir, 'models'),
-      override: {
-        mutator: {
-          path: joinPath(options.mutatorPath, `${descriptor.mutatorFile}.ts`),
-          name: descriptor.mutatorName,
-        },
-      },
+      override: buildOverride(descriptor, options.mutatorPath),
     },
     hooks: {
       afterAllFilesWrite: [
@@ -172,7 +203,7 @@ function buildApiEntry(
 }
 
 /**
- * Builds the shared 6-API Orval config object from app-supplied paths.
+ * Builds the Orval config object from app-supplied paths; `apis` defaults to the six legacy services.
  */
 export function defineOrvalConfig(options: DefineOrvalConfigOptions): OrvalConfig {
   const resolved = {
@@ -183,7 +214,7 @@ export function defineOrvalConfig(options: DefineOrvalConfigOptions): OrvalConfi
   };
 
   const config: OrvalConfig = {};
-  for (const descriptor of API_DESCRIPTORS) {
+  for (const descriptor of options.apis ?? API_DESCRIPTORS) {
     config[descriptor.key] = buildApiEntry(descriptor, resolved);
   }
   return config;

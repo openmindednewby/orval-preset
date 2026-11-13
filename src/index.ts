@@ -22,6 +22,8 @@
 export { defineOrvalConfig } from './defineOrvalConfig';
 export type {
   DefineOrvalConfigOptions,
+  OrvalApiDescriptor,
+  OrvalInfiniteOption,
   OrvalConfig,
 } from './defineOrvalConfig';
 
